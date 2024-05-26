@@ -1,16 +1,23 @@
 import os
 import streamlit as st
-from helpers.quiz_list import string_to_list, get_randomized_options
+import re
+
 from PyPDF2 import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from langchain_community.vectorstores import Chroma
+
 from langchain.chains import create_retrieval_chain
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.chains.combine_documents import create_stuff_documents_chain
-from dotenv import load_dotenv
 
+from langchain_community.retrievers import BM25Retriever
+from langchain.retrievers import EnsembleRetriever
+
+from dotenv import load_dotenv
+import json
+import ast
 
 load_dotenv()
 
@@ -45,51 +52,44 @@ llm = ChatGroq (
     model_name = 'llama3-8b-8192'
 )
 template = ChatPromptTemplate.from_template('''
-    You are an expert quiz maker for technical fields. Think a step by step and 
-    create a quiz with {input} questions based only on the provided context: {context}.
+    You are a helpful assistant programmed to generate questions based only on the prided {context}. 
+    Think a step by step and create a quiz with the number of questions provided by user: {input}.
 
-    The quiz type should be Multiple-choice:
-    The format of the quiz type:
-    - Questions:
-        <a. Answer 1>, <b. Answer 2>, <c. Answer 3>, <d. Answer 4>
-        <a. Answer 1>, <b. Answer 2>, <c. Answer 3>, <d. Answer 4>
-        ....
-    - Answers:
-        <Answer1>: <a|b|c|d>
-        <Answer2>: <a|b|c|d>
-        ....
-    Example:
-        - 1. What is the complexity of a binary search tree?
-            a. O(1)
-            b. O(n)
-            c. O(log n)
-            d. O(n^2)
-        - Answers:
-            1. b
+    Your output should be shaped as follows: 
+    1. An outer list that contains 5 inner lists.
+    2. Each inner list represents a set of question and answers, and contains exactly 4 strings in this order:
+    - The generated question.
+    - The correct answer.
+    - The first incorrect answer.
+    - The second incorrect answer.
+
+    Your output should mirror this structure:
+    [
+        ["What is the complexity of a binary search tree?"], 
+        ["a. O(1)"], ["b. O(n)"], ["c. O(log n)"], ["d. O(n^2)"]
+        ["Answer", "b"]
+    ]
+
+    Don't add introduction, note or conclusion. 
     ''')
 
 document_chain = create_stuff_documents_chain(llm, template)
-retriever = st.session_state.vectorstore.as_retriever()
-retrieval_chain = create_retrieval_chain(retriever, document_chain)
-num_questions = st.number_input('Select the number of questions', min_value=1, max_value=5, value=1)
+retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 2})
+data_retriever  = BM25Retriever.from_texts(st.session_state.chunks) 
+data_retriever.k = 3
+
+ensemble_retriever = EnsembleRetriever(retrievers=[retriever, data_retriever], weights=[0.5, 0.5])
+retrieval_chain = create_retrieval_chain(ensemble_retriever, document_chain)
+
+num_questions = st.number_input('Select the number of questions', min_value=1, max_value=15)
 
 if num_questions:
-    response = retrieval_chain.invoke({"input": f"num_questions:{num_questions}"})
-    st.session_state.response = response
+    response = retrieval_chain.invoke({"input": f"{num_questions}"})
     submitted = st.button('Generate')
-    if submitted:
-        st.write(st.session_state.response)
-        # With a streamlit expander
-        with st.expander("Document Similarity Search"):
-            # Find the relevant chunks
-            for i, doc in enumerate(response["context"]):
-                # print(doc)
-                # st.write(f"Source Document # {i+1} : {doc.metadata['source'].split('/')[-1]}")
-                st.write(doc.page_content)
-                st.write("--------------------------------")
 
-        
-
-
-
-        
+if submitted and 'answer' in response:
+    response_text = response["answer"]
+    response_data = response_text.split(':')[1]
+    #response_data = json.loads(response_text)
+    data_clean = ast.literal_eval(response_data)
+    st.write(data_clean)
