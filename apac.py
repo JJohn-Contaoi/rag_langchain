@@ -1,6 +1,5 @@
 import os
 import streamlit as st
-import re
 
 from PyPDF2 import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -16,7 +15,6 @@ from langchain_community.retrievers import BM25Retriever
 from langchain.retrievers import EnsembleRetriever
 
 from dotenv import load_dotenv
-import json
 import ast
 
 load_dotenv()
@@ -90,6 +88,5 @@ if num_questions:
 if submitted and 'answer' in response:
     response_text = response["answer"]
     response_data = response_text.split(':')[1]
-    #response_data = json.loads(response_text)
     data_clean = ast.literal_eval(response_data)
     st.write(data_clean)
