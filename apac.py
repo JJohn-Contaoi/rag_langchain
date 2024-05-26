@@ -15,6 +15,7 @@ from langchain_community.retrievers import BM25Retriever
 from langchain.retrievers import EnsembleRetriever
 
 from dotenv import load_dotenv
+import json
 import ast
 
 load_dotenv()
@@ -43,7 +44,6 @@ if 'vectorstore' not in st.session_state:
     )
     st.session_state.chunks = st.session_state.text_splitter.split_text(st.session_state.texts)
     st.session_state.vectorstore = Chroma.from_texts(st.session_state.chunks, st.session_state.embeddings)
-    st.write('success')   
 
 llm = ChatGroq (
     groq_api_key = groq_api_key, 
@@ -63,9 +63,8 @@ template = ChatPromptTemplate.from_template('''
 
     Your output should mirror this structure:
     [
-        ["What is the complexity of a binary search tree?"], 
-        ["a. O(1)"], ["b. O(n)"], ["c. O(log n)"], ["d. O(n^2)"]
-        ["Answer", "b"]
+        ["What is the complexity of a binary search tree?", "a. O(1)", "b. O(n)", "c. O(log n)", "d. O(n^2)"]
+        ...
     ]
 
     Don't add introduction, note or conclusion. 
@@ -85,8 +84,15 @@ if num_questions:
     response = retrieval_chain.invoke({"input": f"{num_questions}"})
     submitted = st.button('Generate')
 
+def string_to_list(s):
+    try:
+        return ast.literal_eval(s)
+    except (SyntaxError, ValueError) as e:
+        st.error(f"Oops: The provided input is not correctly formatted. Please press Generate again.")
+        st.stop()
+
 if submitted and 'answer' in response:
     response_text = response["answer"]
     response_data = response_text.split(':')[1]
-    data_clean = ast.literal_eval(response_data)
+    data_clean = string_to_list(response_data)
     st.write(data_clean)
