@@ -1,0 +1,9 @@
+PyPDF2
+langchain
+langchain-community
+langchain-text-splitters
+fastembed
+langchain-groq
+chromadb
+rank_bm25
+dotenv
