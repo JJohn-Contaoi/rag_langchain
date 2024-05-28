@@ -18,11 +18,6 @@ from helpers.prompt_template import get_advanced_template
 from langchain_groq import ChatGroq
 
 from dotenv import load_dotenv
-# page logic control
-def firstPage(): 
-    st.session_state.page = 0
-def nextPage(): 
-    st.session_state.page += 1
 
 def main():
     #load the environments
@@ -36,7 +31,7 @@ def main():
         layout="centered",
         initial_sidebar_state="collapsed"
     )
-    st.title('Ai Mockup Quiz Generator', divider='rainbow')
+    st.subheader('Ai Mockup Quiz Generator', divider='rainbow')
 
     with st.sidebar:
         uploaded_file = st.file_uploader('Upload your PDFs here.',type=['PDF'])
@@ -73,40 +68,40 @@ def main():
     retrieval_chain = create_retrieval_chain(ensemble_retriever, document_chain)
 
     # the page logic control.
-    fPage = firstPage()
-    nPage = nextPage()
     if 'page' not in st.session_state: 
         st.session_state.page = 0
-
+    def firstPage(): 
+        st.session_state.page = 0
+    def nextPage(): 
+        st.session_state.page += 1
+    
     # page 0/starting page
     if st.session_state.page == 0:
         with st.container(border=True):
-            num_questions = st.number_input('Select the number of questions', min_value=5, max_value=15)
+            num_questions = st.number_input('Select the number of questions', min_value=1, max_value=15)
             submitted = st.button('Generate')
-            # creating a form or container to take the generated quiz.
-            if submitted or ('data_clean' in st.session_state):
-                if not uploaded_file:
-                    st.info('Please provide a document to generate a quiz.')
-                    st.stop()
-                response = retrieval_chain.invoke({"input": f"{num_questions}"})
-                response_text = response["answer"]
-                response_data = response_text.split(':')[1]
-                st.session_state.data_clean = string_to_list(response_data)
 
-                if 'randomized_options' not in st.session_state:
-                    st.session_state.randomized_options = []
-                if 'user_answers' not in st.session_state:
-                    st.session_state.user_answers = [None for _ in st.session_state.data_clean]
-                if 'correct_answers' not in st.session_state:
-                    st.session_state.correct_answers = []
-                try:
-                    for q in st.session_state.data_clean:
-                        options, correct_answer = get_randomized_options(q[1:])
-                        st.session_state.randomized_options.append(options)
-                        st.session_state.correct_answers.append(correct_answer)
-                except IndexError:
-                    st.write("An error occurred while generating the questions. Please try again.")
+        if submitted or ('data_clean' in st.session_state):
+            response = retrieval_chain.invoke({"input": f"{num_questions}"})
+            response_text = response["answer"]
+            response_data = response_text.split(':')[1]
+            st.session_state.data_clean = string_to_list(response_data)
 
+            if 'randomized_options' not in st.session_state:
+                st.session_state.randomized_options = []
+            if 'user_answers' not in st.session_state:
+                st.session_state.user_answers = [None for _ in st.session_state.data_clean]
+            if 'correct_answers' not in st.session_state:
+                st.session_state.correct_answers = []
+            try:
+                for q in st.session_state.data_clean:
+                    options, correct_answer = get_randomized_options(q[1:])
+                    st.session_state.randomized_options.append(options)
+                    st.session_state.correct_answers.append(correct_answer)
+            except IndexError:
+                st.write("An error occurred while generating the questions. Please try again.")
+            st.write()
+            if 'data_clean' in st.session_state:
                 st.subheader("🧠 Quiz Time: Test Your Knowledge!", anchor=False)
                 for i, q in enumerate(st.session_state.data_clean):
                     options = st.session_state.randomized_options[i]
@@ -115,33 +110,37 @@ def main():
                     user_choice_index = options.index(responsed)
                     st.session_state.user_answers[i] = user_choice_index  # Update the stored answer right after fetching it
 
-                results_submitted = st.button(label='Finish', on_click=nPage)
-    # page 1/last page of the day
+                results_submitted = st.button(label='Finish', on_click=nextPage)
+
     elif st.session_state.page == 1:
-        with ph.container(border=True):
-            score = sum([ua == st.session_state.randomized_options[i].index(ca) for i, (ua, ca) in enumerate(zip(st.session_state.user_answers, st.session_state.correct_answers))])
-            st.success(f"Your score: {score}/{len(st.session_state.data_clean)}")
-            if score == len(st.session_state.data_clean):  # Check if all answers are correct
-                st.balloons()
-            else:
-                incorrect_count = len(st.session_state.data_clean) - score
-                if incorrect_count == 1:
-                    st.warning(f"Almost perfect! You got 1 question wrong. Let's review it:")
+        if 'results_submitted' not in st.session_state:
+            st.session_state.results_submitted = False
+
+        if not st.session_state.results_submitted:
+            with st.container(border=True):
+                score = sum([ua == st.session_state.randomized_options[i].index(ca) for i, (ua, ca) in enumerate(zip(st.session_state.user_answers, st.session_state.correct_answers))])
+                st.success(f"Your score: {score}/{len(st.session_state.data_clean)}")
+                if score == len(st.session_state.data_clean):  # Check if all answers are correct
+                    st.balloons()
                 else:
-                    st.warning(f"Almost there! You got {incorrect_count} questions wrong. Let's review them:")
-            # enumerating the given questions and correct answers for user reviews            
-            for i, (ua, ca, q, ro) in enumerate(zip(st.session_state.user_answers, st.session_state.correct_answers, st.session_state.data_clean, st.session_state.randomized_options)):
-                question = f"Question {i + 1}:"
-                user_answer = f"Your answer: {ro[ua]}"
-                correct_answer = f"correct answer: {ca}"
-                if ro[ua] != ca:
-                    st.markdown(f"{question}\n{user_answer}\n{correct_answer}", unsafe_allow_html=True)
-                    st.error(correct_answer)
-                else:
-                    st.markdown(f"{question}\n{user_answer}\n{correct_answer}", unsafe_allow_html=True)
-                    st.success(correct_answer)
-                    st.markdown("---")
-            st.button("Generate quiz again!",on_click=fPage)
+                    incorrect_count = len(st.session_state.data_clean) - score
+                    if incorrect_count == 1:
+                        st.warning(f"Almost perfect! You got 1 question wrong. Let's review it:")
+                    else:
+                        st.warning(f"Almost there! You got {incorrect_count} questions wrong. Let's review them:", divider='rainbow')
+
+                    for i, (ua, ca, q, ro) in enumerate(zip(st.session_state.user_answers, st.session_state.correct_answers, st.session_state.data_clean, st.session_state.randomized_options)):
+                        question = f"Question {i + 1}:"
+                        user_answer = f"Your answer: {ro[ua]}"
+                        correct_answer = f"answer: {ca}"
+                        if ro[ua] != ca:
+                            st.markdown(f"{question}\n{user_answer}\n{correct_answer}", unsafe_allow_html=True)
+                            st.error(correct_answer)
+                        else:
+                            st.markdown(f"{question}\n{user_answer}\n{correct_answer}", unsafe_allow_html=True)
+                            st.success(correct_answer)
+                            st.markdown("---")
+                review_submitted = st.button(label='Generate again?', on_click=firstPage)
 
 if __name__ == '__main__':
     main()
