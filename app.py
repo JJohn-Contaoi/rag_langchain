@@ -81,36 +81,36 @@ def main():
             num_questions = st.number_input('Select the number of questions', min_value=1, max_value=15)
             submitted = st.button('Generate')
 
-        if submitted or ('data_clean' in st.session_state):
-            response = retrieval_chain.invoke({"input": f"{num_questions}"})
-            response_text = response["answer"]
-            response_data = response_text.split(':')[1]
-            st.session_state.data_clean = string_to_list(response_data)
+            if submitted or ('data_clean' in st.session_state):
+                response = retrieval_chain.invoke({"input": f"{num_questions}"})
+                response_text = response["answer"]
+                response_data = response_text.split(':')[1]
+                st.session_state.data_clean = string_to_list(response_data)
 
-            if 'randomized_options' not in st.session_state:
-                st.session_state.randomized_options = []
-            if 'user_answers' not in st.session_state:
-                st.session_state.user_answers = [None for _ in st.session_state.data_clean]
-            if 'correct_answers' not in st.session_state:
-                st.session_state.correct_answers = []
-            try:
-                for q in st.session_state.data_clean:
-                    options, correct_answer = get_randomized_options(q[1:])
-                    st.session_state.randomized_options.append(options)
-                    st.session_state.correct_answers.append(correct_answer)
-            except IndexError:
-                st.write("An error occurred while generating the questions. Please try again.")
-            st.write()
-            if 'data_clean' in st.session_state:
-                st.subheader("🧠 Quiz Time: Test Your Knowledge!", anchor=False)
-                for i, q in enumerate(st.session_state.data_clean):
-                    options = st.session_state.randomized_options[i]
-                    default_index = st.session_state.user_answers[i] if st.session_state.user_answers[i] is not None else 0
-                    responsed = st.radio(q[0], options, index=default_index)
-                    user_choice_index = options.index(responsed)
-                    st.session_state.user_answers[i] = user_choice_index  # Update the stored answer right after fetching it
+                if 'randomized_options' not in st.session_state:
+                    st.session_state.randomized_options = []
+                if 'user_answers' not in st.session_state:
+                    st.session_state.user_answers = [None for _ in st.session_state.data_clean]
+                if 'correct_answers' not in st.session_state:
+                    st.session_state.correct_answers = []
+                try:
+                    for q in st.session_state.data_clean:
+                        options, correct_answer = get_randomized_options(q[1:])
+                        st.session_state.randomized_options.append(options)
+                        st.session_state.correct_answers.append(correct_answer)
+                except IndexError:
+                    st.write("An error occurred while generating the questions. Please try again.")
+                st.write()
+                if 'data_clean' in st.session_state:
+                    st.subheader("🧠 Quiz Time: Test Your Knowledge!", anchor=False)
+                    for i, q in enumerate(st.session_state.data_clean):
+                        options = st.session_state.randomized_options[i]
+                        default_index = st.session_state.user_answers[i] if st.session_state.user_answers[i] is not None else 0
+                        responsed = st.radio(q[0], options, index=default_index)
+                        user_choice_index = options.index(responsed)
+                        st.session_state.user_answers[i] = user_choice_index  # Update the stored answer right after fetching it
 
-                results_submitted = st.button(label='Finish', on_click=nextPage)
+                    results_submitted = st.button(label='Finish', on_click=nextPage)
 
     elif st.session_state.page == 1:
         if 'results_submitted' not in st.session_state:
@@ -127,7 +127,7 @@ def main():
                     if incorrect_count == 1:
                         st.warning(f"Almost perfect! You got 1 question wrong. Let's review it:")
                     else:
-                        st.warning(f"Almost there! You got {incorrect_count} questions wrong. Let's review them:", divider='rainbow')
+                        st.warning(f"Almost there! You got {incorrect_count} questions wrong. Let's review them:")
 
                     for i, (ua, ca, q, ro) in enumerate(zip(st.session_state.user_answers, st.session_state.correct_answers, st.session_state.data_clean, st.session_state.randomized_options)):
                         question = f"Question {i + 1}:"
